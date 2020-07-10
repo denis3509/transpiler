@@ -27,5 +27,5 @@ module.exports = function (node) {
       this._nl + this._nl +
       doBody.call(this, writer, '', node.children[0].children, true);
   }
-  return str + doBody.call(this, writer, '', node.children, true) +  '?>';
+  return str + doBody.call(this, writer, '', node.children, true) + this._nl + '?>';
 };

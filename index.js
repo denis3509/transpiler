@@ -13,7 +13,7 @@ const defaults = {
 
 class Transpiler {
   _tempVarCount = 0;
-  _nodeReplacers = [];
+
   _messages = [];
   _preTranspileFile = [];
   _preTranspileDirectory = [];
@@ -164,7 +164,7 @@ class Transpiler {
 
 const createTranspiler = (...plugins) => {
 
-  plugins && plugins.forEach(plugin => {
+    plugins.forEach(plugin => {
     for (let key in plugin.transpilerProps) {
       if (!Transpiler.prototype.hasOwnProperty(key)) {
         Transpiler.prototype[key] = plugin.transpilerProps[key];
