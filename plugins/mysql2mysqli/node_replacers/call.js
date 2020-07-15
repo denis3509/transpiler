@@ -1,5 +1,4 @@
- 
-const callReplacer = (writer,node, indent,  self) => {
+const callReplacer = (writer, node, indent, self) => {
 
   const replaceFalse = () => {
     return writer(node.what, indent) +
@@ -13,120 +12,131 @@ const callReplacer = (writer,node, indent,  self) => {
       '(' + self.params(node.arguments, indent, self) + '))'
   };
 
- /* const replace_mysql_connect = (options) => {
-    const { host, user, pass, dbname } = self._currentMysqlParams;
-    const connectVar = self._currentConnectVar;
-    let hostName, port, socket;
-    if (host.indexOf(':') > -1 || host.indexOf('/') > -1) {
-      [hostName, port] = host.split(':');
-      const tempArr = port.split('/');
-      port = tempArr.shift();
-      socket = tempArr.join('/');
-    }
-    return    `$GLOBALS['${connectVar}'] = ` +
-    `mysqli_connect(${hostName}, ${user}, ${pass}, ${dbname}`
-    + port ? `,${port}` : ``
-    + socket ? `,${socket}` : `` + `);\n`
-  }*/
+  const addI = () => {
+    return node.what.name.replace("mysql", "mysqli") +
+      '(' + self.params(node.arguments, indent, self) + ')';
+  };
+  const addIandId = () => {
+    const coma = node.arguments.length > 0 ? ', ' : '';
+    return node.what.name.replace("mysql", "mysqli") +
+      `($_GLOBALS["${self._mysql.connectVar}"]` + coma +
+      self.params(node.arguments, indent, self) + ")";
+  };
 
-  // const replace_mysql_select_db = (options) => {
-  //   const { host, user, pass, dbname } = self._currentMysqlParams
-  //   const connectVar = self._currentConnectVar
-  //   const arg = node.right && node.right && node.right.arguments[0]
-  //   if (dbname === arg) {
-  //     return writer(node.left) + `= $GLOBALS['${connectVar}']`
-  //   } else {
-  //     const { host, user, pass, dbname } = self._currentMysqlParams
-  //     const connectVar = self._currentConnectVar
-  //     let hostName, port, socket
-  //     if (host.indexOf(':') > -1 || host.indexOf('/') > -1) {
-  //       [hostName, port] = host.split(':')
-  //       const tempArr = port.split('/')
-  //       port = tempArr.shift()
-  //       socket = tempArr.join('/')
-  //     }
-  //     return `$GLOBALS['${connectVar}'] = ` +
-  //     `mysqli_connect(${hostName}, ${user}, ${pass}, ${dbname}` + port ? `,${port}` : ``
-  //     + socket ? `,${socket}` : `` + `);\n`
-  //   }
-  // }
+  const replace_mysql_connect = (options) => {
+    const args = [...self.params(node.arguments, indent, self).split(", ")];
+    const host = args.shift().replace(/['"]/g, '');
+    const [hostname, port] = host.split(":");
 
-/*
-  const replace_mysql_fetch_field =  (options) => {
-    let [firstArg, secondArg] = node.arguments;
-    if (!secondArg) return `${writer(options.leftAssign)}` +
-      `= mysqli_fetch_field(${writer(firstArg)}));`
-    return `for(x=0; x<${writer(secondArg)}; x++) {
-      mysqli_fetch_field(${writer(firstArg)});
-    }
-    ${writer(options.leftAssign)} = mysqli_fetch_field(${writer(firstArg)});`
-  }
-*/
+    return `$_GLOBALS["${self._mysql.connectVar}"] = mysqli_connect("${hostname}", ` +
+      `${args.join(", ")}${port ? ', ' + port : ''})`;
+  };
 
-/*  const replace_mysql_result = (options) =>  {
-    const [result,num,field] = node.arguments;
-    const finfo = this._createTempVariable();
-    const f = this._createTempVariable();
-    return `mysqli_data_seek(${writer(result)}, ${writer(num)});
-            if( !empty(${writer(field)}) ) {
-              while(${finfo} = mysqli_fetch_field( ${writer(result)} )) {
-                if( ${writer(field)} == ${finfo}->name ) {
-                  ${f} = mysqli_fetch_assoc( ${writer(result)} );
-                  ${writer(options.leftAssign)} =  $f[ ${writer(field)} ];
-                }
-              }
-            } else {
-              ${f} = mysqli_fetch_array(${writer(result)} );
-              ${writer(options.leftAssign)} = ${f}[0];
-            }
-            `
-  }*/
-
-/*
-  const replace_is_a = () => {
-    const [object, classObject] = node.arguments;
-    return `${writer(object)} instanceof ${writer(classObject)} `
-  }
-*/
-
-/*
-  const replace_convert_object_to_array = ( ) => {
-    let   useArgs = [], space, raw;
-    let args = node.arguments;
-    function processElement(indent) {
-      return function (arg) {
-        return `(array)${writer(arg, indent)};`
-      };
-    }
-    if (args && args.length > 0) {
-      useArgs = args.map(processElement(indent));
-    }
-    raw = useArgs.join();
-    if ((raw.indexOf("\n") > -1
-      && raw.substr(0, raw.indexOf("\n")).length > 80)
-      || (raw.indexOf("\n") === -1 && raw.length > 80)) {
-      useArgs = args.map(processElement(indent + self.indent));
-      space = self.nl + indent + self.indent;
-      args = space + useArgs.join(',' + space) + self.nl + indent;
+  const replace_mysql_select_db = () => {
+    const args = [...self.params(node.arguments, indent, self).split(", ")];
+    const db_name = args.shift();
+    if (node.arguments.length === 1) {
+      return `mysqli_select_db($_GLOBALS["${self._mysql.connectVar}"], ${db_name})`
     } else {
-      args = useArgs.join(',' + self.ws);
+      return `mysqli_select_db(${args[0]}, ${db_name})`;
     }
-    return node.what.name + `(${args});`
-  }
-*/
+  };
+  const replace_mysql_create_db = () => {
+
+    return `mysqli_query($_GLOBALS["${self._mysql.connectVar}"], ` +
+      `"CREATE DATABASE ".${self.params(node.arguments, indent, self)})`
+  };
+
+  const replace_mysql_drop_db = () => {
+
+    return `mysqli_query($_GLOBALS["${self._mysql.connectVar}"], ` +
+      `"DROP DATABASE ".${self.params(node.arguments, indent, self)})`
+  };
+
+  const replace_mysql_escape_string = () => {
+    return `mysql_real_escape_string($_GLOBALS["${self._mysql.connectVar}"],` +
+      ` ${self.params(node.arguments, indent, self)})`;
+  };
+
+  const replace_mysql_client_encoding = () => {
+    return `mysqli_character_set_name($_GLOBALS["${self._mysql.connectVar}"])`;
+  };
+
+  const replace_mysql_list_dbs = () => {
+    return `mysqli_query($_GLOBALS["${self._mysql.connectVar}"], "SHOW DATABASES")`;
+  };
+
+  const replace_mysql_list_process = () => {
+    return `mysqli_thread_id($_GLOBALS["${self._mysql.connectVar}"])`;
+  };
+
+  const replace_mysql_list_tables = () => {
+    return `mysqli_query($_GLOBALS["${self._mysql.connectVar}"],` +
+      ` "SHOW TABLES from ".${self.params(node.arguments, indent, self)}`
+  };
+
+  const replace_mysql_num_fields = () => {
+    return `mysqli_field_count($_GLOBALS["${self._mysql.connectVar}"], ` +
+      `${self.params(node.arguments, indent, self)})`;
+  };
+  const replace_mysql_unbuffered_query = () => {
+    return `mysqli_query($_GLOBALS["${self._mysql.connectVar}"], ` +
+      `${self.params(node.arguments, indent, self)}, MYSQLI_USE_RESULT)`
+  };
+  const replace_mysql_field_name = () => {
+    return `mysqli_fetch_field_direct(${self.params(node.arguments, indent, self)})->name`
+  };
+  const replace_mysql_field_length = () => {
+    return `mysqli_fetch_field_direct(${self.params(node.arguments, indent, self)})->length`
+  };
+  const replace_mysql_field_table = () => {
+    return `mysqli_fetch_field_direct(${self.params(node.arguments, indent, self)})->table`
+  };
 
   const calls = {
+    "mysql_field_name": () => replace_mysql_field_name(),
+    "mysql_field_len": () => replace_mysql_field_length(),
+    "mysql_field_table": () => replace_mysql_field_table(),
     'ip2long': () => replaceFalse(),
     'get_class': () => strToLower(),
     'get_parent_class': () => strToLower(),
-    // 'mysql_connect': (options) => replace_mysql_connect(options),
-    // 'mysql_select_db': (options) => replace_mysql_select_db(options),
-    // "mysql_fetch_field" : (options) => replace_mysql_fetch_field(options),
-    // "mysql_result" : (options) => replace_mysql_result(options),
-    // "is_a" : () => replace_is_a(),
-    // "natsort": () => replace_convert_object_to_array(),
+    "get_class_methods": () => strToLower(),
+    'mysql_data_seek': () => addI(),
+    "mysql_fetch_array": () => addI(),
+    "mysql_fetch_assoc": () => addI(),
+    "mysql_fetch_lengths": () => addI(),
+    "mysql_fetch_object": () => addI(),
+    "mysql_fetch_row": () => addI(),
+    "mysql_field_seek": () => addI(),
+    "mysql_free_result": () => addI(),
+    "mysql_num_rows": () => addI(),
+    "mysql_affected_rows": () => addIandId(),
+    "mysql_close": () => addIandId(),
+    "mysql_errno": () => addIandId(),
+    "mysql_error": () => addIandId(),
+    "mysql_get_client_info": () => addIandId(),
+    "mysql_get_host_info": () => addIandId(),
+    "mysql_get_proto_info": () => addIandId(),
+    "mysql_get_server_info": () => addIandId(),
+    "mysql_info": () => addIandId(),
+    "mysql_insert_id": () => addIandId(),
+    "mysql_ping": () => addIandId(),
+    "mysql_real_escape_string": () => addIandId(),
+    "mysql_stat": () => addIandId(),
+    "mysql_thread_id": () => addIandId(),
+    'mysql_connect': (options) => replace_mysql_connect(options),
+    "mysql_select_db": () => replace_mysql_select_db(),
+    "mysql_drop_db": () => replace_mysql_drop_db(),
+    "mysql_escape_string": () => replace_mysql_escape_string(),
+    "mysql_client_encoding": () => replace_mysql_client_encoding(),
+    "mysql_list_dbs": () => replace_mysql_list_dbs(),
+    "mysql_list_processes": () => replace_mysql_list_process(),
+    "mysql_num_fields": () => replace_mysql_num_fields(),
+    "mysql_unbuffered_query": () => replace_mysql_unbuffered_query(),
+    "mysql_list_tables": () => replace_mysql_list_tables(),
+    "mysql_create_db": () => replace_mysql_create_db(),
   };
-  if (calls[node.what.name]) return calls[node.what.name];
+  if (typeof calls[node.what.name] === 'function') return calls[node.what.name]();
   return false;
 };
 module.exports = callReplacer;

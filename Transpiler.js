@@ -13,7 +13,6 @@ const defaults = {
 
 class Transpiler {
   _tempVarCount = 0;
-
   _messages = [];
   _preTranspileFile = [];
   _preTranspileDirectory = [];
@@ -28,12 +27,12 @@ class Transpiler {
     this._forceNamespaceBrackets = this._options.forceNamespaceBrackets || false;
   }
 
-  _addMessage(message) {
+  _addMessage(text, node) {
     this._messages.push(message);
   }
 
   _createTempVar() {
-    return 'tempVar' + this._tempVarCount++;
+    return '$tempVar' + ++this._tempVarCount;
   }
 
   processFile(File, path) {
@@ -64,6 +63,15 @@ class Transpiler {
       return indent
     }
     if (node && node.kind) {
+      let writer = this.convert.bind(this);
+      let result;
+      let count = 0;
+      this._nodeReplacers.forEach(replacer => {
+
+        let r = replacer(writer, node, indent, this);
+        if (r) result = r;
+      });
+      if (result) return result;
       if (typeof this[node.kind] === 'function') {
         return this[node.kind](node, indent)
       }
@@ -162,9 +170,10 @@ class Transpiler {
   params = require('./node_translators/helper/parameters')
 }
 
+//TODO move create plugin to constructor
 const createTranspiler = (...plugins) => {
 
-    plugins.forEach(plugin => {
+  plugins.forEach(plugin => {
     for (let key in plugin.transpilerProps) {
       if (!Transpiler.prototype.hasOwnProperty(key)) {
         Transpiler.prototype[key] = plugin.transpilerProps[key];
@@ -181,8 +190,13 @@ const createTranspiler = (...plugins) => {
     }
     Transpiler.prototype._nodeReplacers = [];
     Transpiler.prototype._preTranspileDirectory = [];
-    Transpiler.prototype._nodeReplacers.push(plugin.nodeReplacer);
-    Transpiler.prototype._preTranspileDirectory.push(plugin.preTranspileDirectory);
+    Transpiler.prototype._preTranspileFile = [];
+    plugin.nodeReplacer
+      ? Transpiler.prototype._nodeReplacers.push(plugin.nodeReplacer)
+      : null;
+    plugin._preTranspileDirectory
+      ? Transpiler.prototype._preTranspileDirectory.push(plugin.preTranspileDirectory)
+      : null;
   });
 
   return Transpiler;

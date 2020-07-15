@@ -1,6 +1,8 @@
 const Plugin = require('../Plugin');
 const plugin = new Plugin();
 const callReplacer = require('./node_replacers/call');
+const assignReplacer = require('./node_replacers/assign');
+
 plugin.fileMethods.getMySqlParams = function getMysqlParams() {
   const mysqli = {};
 
@@ -29,10 +31,12 @@ plugin.fileMethods.getMySqlParams = function getMysqlParams() {
   return mysqli;
 };
 
-plugin.transpilerProps._currentMysqlParams = {};
+plugin.transpilerProps._mysql ={
+  connectVarCount : 0,
+};
 
-plugin.transpilerMethods.setCurrentMysqlParams = function (file) {
- this._currentMysqlParams = file.getMysqlParams();
+plugin.transpilerMethods.createConnectVar = function (file) {
+  this._mysql.connectVar = this._mysql.connectVarCount++;
 };
 plugin.preTranspileFile = function () {
   console.log('preTranspileFile this', this);
@@ -43,10 +47,10 @@ plugin.preTranspileDirectory = function() {
 };
 plugin.nodeReplacer = function (writer, node, indent, self) {
   const nodes = {
-    call : callReplacer(writer, node, indent, self),
+    call : () => callReplacer(writer, node, indent, self),
+    assign : ()=> assignReplacer(writer, node, indent, self),
   };
-
-  if (nodes[node.kind]) return nodes[node.kind](writer,node,indent,self);
+  if (typeof nodes[node.kind] === "function") return nodes[node.kind]();
   return false;
 };
 module.exports = plugin;
